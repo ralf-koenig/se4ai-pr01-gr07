@@ -1,0 +1,17 @@
+name: languague-pipeline
+
+jobs:
+  run_tests:
+    container: python:3.9
+    id: changed_files
+    with:
+      files: |
+        app.py
+        test_app.py
+    steps:
+      - run: python --version
+      - run: pip install pytest
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -vvv test_app.py
+    
+  build_image:
