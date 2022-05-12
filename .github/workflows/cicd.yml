@@ -1,4 +1,4 @@
-name: languague-pipeline-cd
+name: languague-pipeline-cicd
 
 on:
   push:
