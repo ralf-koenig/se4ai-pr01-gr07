@@ -21,7 +21,8 @@ jobs:
       - name: tests
         run: |
           python -m pytest -vvv test_app.py
-  build:
+  build_and_deploy:
+    needs: run_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
