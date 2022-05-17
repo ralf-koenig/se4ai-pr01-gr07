@@ -1,9 +1,10 @@
-name: languague-pipeline-cd
+name: languague-pipeline-cicd
 
 on:
   push:
     branches: ["main"]
   pull_request:
+    branches: ["main"]
 
 jobs:
   run_tests:
@@ -21,7 +22,8 @@ jobs:
       - name: tests
         run: |
           python -m pytest -vvv test_app.py
-  build:
+  build_and_deploy:
+    needs: run_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
