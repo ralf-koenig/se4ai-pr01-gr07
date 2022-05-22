@@ -30,12 +30,12 @@ def load_model(filename: str):
 
 
 # cannot be cached due to object type, would need hash method for caching in streamlit
-def create_vectorize_layer():
+def create_vectorize_layer(lang_list):
     """
     Creates the vectorize layer that is needed for the input text to be converted to numbers.
     """
     max_features = 10000  # top 10K most frequent words
-    sequence_length = 50  # We defined it in the previous data exploration section
+    sequence_length = 50  # We defined it in the data exploration section
 
     vectorize_layer = tf.keras.layers.TextVectorization(
         standardize="lower_and_strip_punctuation",
@@ -46,11 +46,15 @@ def create_vectorize_layer():
     data_directory = "data"
 
     train_df = pd.read_csv(os.path.join(data_directory, "train.csv"))
+
+    # filter training_data to the three languages
+    train_df = train_df.loc[train_df.labels.isin(lang_list)]
+
     vectorize_layer.adapt(train_df["text"].to_list())  # vectorize layer is fitted to the training data
     return vectorize_layer
 
 
-def _detect_language(model, vectorize_layer):
+def _detect_language(model, vectorize_layer, lang_list):
     """
     Detects the actual language of the input text.
     The input text itself is read from the session state.
@@ -73,7 +77,6 @@ def _detect_language(model, vectorize_layer):
     idx_predictions = np.argmax(probits, axis=1)
 
     le = preprocessing.LabelEncoder()
-    lang_list = ["es", "en", "de"]
     le.fit(lang_list)
 
     probability = np.max(probits, axis=1)[0]
@@ -99,6 +102,7 @@ def submit_feedback():
 
 def main():
     lang_labels = {"es": "Spanish", "en": "English", "de": "German"}
+    lang_list = ["es", "en", "de"]
 
     # The next two UI elements are common for all screens
     st.title('SE4AI - Language Identification - Group 07')
@@ -128,7 +132,7 @@ def main():
         # load pickled language model
         language_model = load_model("simple_mlp_novectorize.h5")
         # create the necessary vectorize layer for the text input
-        vectorize_layer = create_vectorize_layer()
+        vectorize_layer = create_vectorize_layer(lang_list)
 
         st.text_area(
             "Please enter sample text to detect language:",
@@ -140,7 +144,7 @@ def main():
         st.button(
             label='Detect language',
             on_click=_detect_language,
-            args=(language_model, vectorize_layer)
+            args=(language_model, vectorize_layer, lang_list)
         )
 
     elif st.session_state.ui_state == "render_result":
