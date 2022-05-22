@@ -13,21 +13,20 @@ def getdata(url):
     return r.text
 
 
-def generate_sentences_from_wikipedia(url, language):
+def get_text_from_html(url):
     html_data = getdata(url)
     soup = BeautifulSoup(html_data, 'html.parser')
     clean_text = ""
     for data in soup.find_all("p"):
         clean_text = clean_text + data.get_text()
+    return clean_text
 
-    # Remove citation remarks
-    pattern = r'\[.*?\]'
-    clean_text = re.sub(pattern, '', clean_text)
-    # Split text into sentences
-    split_sentence = tokenize.sent_tokenize(clean_text)
-    # Create prefix for training data
-    language_id = language + ","
 
+def remove_spanish_citation(spanish_sentence):
+    return spanish_sentence.replace("\u200b\u200b", " ").replace("\u200b", " ").replace("«", " ").replace("»", " ")
+
+
+def remove_short_sentence(split_sentence, language_id):
     # Append short cut sentence to prior sentence and remove it from dataset
     i = 1
     remove_elements = []
@@ -42,6 +41,21 @@ def generate_sentences_from_wikipedia(url, language):
         del split_sentence[element]
 
     return split_sentence
+
+def generate_sentences_from_wikipedia(url, language):
+    clean_text = get_text_from_html(url)
+    # Remove citation remarks
+    pattern = r'\[.*?\]'
+    clean_text = re.sub(pattern, '', clean_text)
+    # Remove weird spanish citation remarks
+    if language == "es":
+        clean_text = remove_spanish_citation(clean_text)
+    # Split text into sentences
+    split_sentence = tokenize.sent_tokenize(clean_text)
+    # Create prefix for training data
+    language_id = language + ","
+
+    return remove_short_sentence(split_sentence, language_id)
 
 
 def get_language_of_article(url):
@@ -72,13 +86,34 @@ def generate_csv(all_sentences):
         for sentence in all_sentences:
             filewriter.writerow([sentence[:2], sentence[3:]])
 
+def remove_long_rows(all_sentences):
+    for sentence in all_sentences:
+        if '\n' in sentence:
+            all_sentences.remove(sentence)
+    return all_sentences
+
+
+def remove_weird_rows(all_sentences):
+    for sentence in all_sentences:
+        if not sentence.startswith("de") or sentence.startswith("en") or sentence.startswith("es"):
+            all_sentences.remove(sentence)
+    return all_sentences
+
+
 if __name__=="__main__":
 
     urls = [".wikipedia.org/wiki/Linus_Torvalds",
                 ".wikipedia.org/wiki/Leipzig",
                 ".wikipedia.org/wiki/Madrid",
                 ".wikipedia.org/wiki/Sigmund_Freud",
-                ".wikipedia.org/wiki/Pablo_Picasso"]
+                ".wikipedia.org/wiki/Pablo_Picasso",
+                ".wikipedia.org/wiki/Wolfgang_Amadeus_Mozart",
+                ".wikipedia.org/wiki/Marie_Curie",
+                ".wikipedia.org/wiki/Stephen_Hawking",
+                ".wikipedia.org/wiki/Galileo_Galilei",
+                ".wikipedia.org/wiki/Immanuel_Kant",
+                ".wikipedia.org/wiki/James_Clerk_Maxwell",
+                ".wikipedia.org/wiki/Angela_Merkel"]
 
     all_urls = []
     languages = ["de", "en", "es"]
@@ -88,6 +123,8 @@ if __name__=="__main__":
             all_urls.append(article)
 
     all_sentences = generate_sentence_from_list_of_articles(all_urls)
+    all_sentences = remove_long_rows(all_sentences)
+    all_sentences = remove_weird_rows(all_sentences)
     random.shuffle(all_sentences)
     generate_csv(all_sentences)
 
