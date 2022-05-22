@@ -1,6 +1,11 @@
+"""
+Language identification for the three languages: German, English, Spanish.
+
+This module encapsulates a graphical user interface in a web application served by the Python package streamlit.
+"""
+
 import streamlit as st
 import os.path
-import sys
 import tensorflow as tf
 import numpy as np
 from sklearn import preprocessing
@@ -25,8 +30,7 @@ def load_model(filename: str):
             saved_model = tf.keras.models.load_model(path)
             return saved_model
         except OSError:
-            print("Could not open/read file:", path)
-            sys.exit()
+            st.error("Could not open/read file:", path)
 
 
 # cannot be cached due to object type, would need hash method for caching in streamlit
@@ -87,7 +91,7 @@ def _detect_language(model, vectorize_layer, lang_list):
     le = preprocessing.LabelEncoder()
     le.fit(lang_list)
 
-    # get back from a class number like 0, 1, 2 to a class name like de, es, en
+    # get back from a class number like 0, 1, 2 to a class name like de, en, es
     language = list(le.inverse_transform(idx_predictions))[0]
 
     # get best probability of the three, after softmax
