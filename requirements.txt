@@ -3,3 +3,5 @@ tensorflow
 pandas
 numpy
 scikit-learn
+psycopg2
+python-dotenv

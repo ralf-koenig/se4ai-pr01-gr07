@@ -5,12 +5,15 @@ This module app.py encapsulates a graphical user interface in a web application 
 """
 
 import os.path
-
 import streamlit as st
 import tensorflow as tf
 import pandas as pd
 import numpy as np
 from sklearn import preprocessing
+import os
+from dotenv import load_dotenv
+import psycopg2
+
 
 # TODO: change to use inference pipeline here from the language_identification package
 # import language_identification.inference
@@ -111,14 +114,31 @@ def submit_feedback():
     """
     Insert a record into a table in a database that collects user feedback.
     """
-    #
-    # INSERT INTO lang_ident_feedback
-    #          (text, predicted_language, probability, language_hint_by_user)
-    # VALUES (
-    #          st.session_state.text_input,
-    #          st.session_state.language,
-    #          st.session_state.probability,
-    #          st.session_state.lang_hint )
+    load_dotenv()
+    conn = psycopg2.connect(
+        database=os.getenv('POSTGRES_DB'),
+        user=os.getenv('POSTGRES_USER'),
+        password=os.getenv('POSTGRES_PASSWORD'),
+        host=os.getenv('POSTGRES_HOST'),
+    )
+
+    # Open cursor to perform database operation
+    cur = conn.cursor()
+    postgres_insert_query = '''
+        INSERT INTO language_identification_feedback(text_from_user_input, language_by_classifier, probability_by_classifier, language_suggested_by_user)
+        VALUES (%s, %s, %s, %s )
+    '''
+    record_to_insert = (
+        st.session_state.text_input,
+        st.session_state.language,
+        float(st.session_state.probability),
+        st.session_state.lang_hint)
+    cur.execute(postgres_insert_query, record_to_insert)
+    conn.commit()
+
+    # Close communications with database
+    cur.close()
+    conn.close()
 
     # This will insert something like: "My text", "de", "0.23232", "en".
     # So the classifier regarded this "My text" as German with 0.23 probability, but the user considers it English
