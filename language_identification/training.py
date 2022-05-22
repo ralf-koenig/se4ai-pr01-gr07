@@ -20,6 +20,7 @@ from sklearn import preprocessing
 # common constants that must match between training and inference
 import language_identification.constants as constants
 
+
 def acquire_text_sample_data_huggingface():
     """
     Get nicely uniform text samples from Huggingface.
@@ -36,6 +37,7 @@ def acquire_text_sample_data_huggingface():
     download("https://huggingface.co/datasets/papluca/language-identification/resolve/main/train.csv", "train.csv")
     download("https://huggingface.co/datasets/papluca/language-identification/resolve/main/valid.csv", "valid.csv")
     download("https://huggingface.co/datasets/papluca/language-identification/resolve/main/test.csv", "test.csv")
+
 
 def acquire_user_feedback():
     """
@@ -223,6 +225,7 @@ def save_model_to_model_directory(model, filename):
             filename)
     )
     return save_result
+
 
 def main():
     train_df, val_df, test_df = preprocess_data()
