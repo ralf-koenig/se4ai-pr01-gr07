@@ -9,8 +9,9 @@ to get back the most probable language and its probability.
 """
 
 import os.path
-import tensorflow as tf
+
 import numpy as np
+import tensorflow as tf
 from sklearn import preprocessing
 
 # common constants that must match between training and inference

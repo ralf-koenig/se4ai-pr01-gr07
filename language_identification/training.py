@@ -207,7 +207,7 @@ def evaluate_model(model, test_ds):
     return loss, accuracy
 
 
-def save_model(model, filename):
+def save_model_to_model_directory(model, filename):
     # Save the model
     if not os.path.isdir(constants.MODEL_DIRECTORY):
         os.mkdir(constants.MODEL_DIRECTORY)
@@ -231,7 +231,7 @@ def main():
     loss, accuracy = evaluate_model(model, test_ds)
     print("Loss: ", loss)
     print("Accuracy: ", accuracy)
-    save_model(model, "simple_mlp_novectorize.h5")
+    save_model_to_model_directory(model, "simple_mlp_novectorize.h5")
 
 
 if __name__ == "__main__":
