@@ -34,9 +34,10 @@ def create_vectorize_layer(lang_list):
     """
     Creates the vectorize layer that is needed for the input text to be converted to numbers.
     """
-    max_features = 10000  # top 10K most frequent words
-    sequence_length = 50  # We defined it in the data exploration section
+    max_features = 10000  # only top 10K most frequent words will be used in the vectorization of the text
+    sequence_length = 50  # up to 50 word will be considered from each text sample
 
+    # create a layer that processes words to integer numbers
     vectorize_layer = tf.keras.layers.TextVectorization(
         standardize="lower_and_strip_punctuation",
         max_tokens=max_features,
@@ -44,13 +45,16 @@ def create_vectorize_layer(lang_list):
         output_sequence_length=sequence_length)
 
     data_directory = "data"
-
+    # load training data in to Pandas data frame
     train_df = pd.read_csv(os.path.join(data_directory, "train.csv"))
 
-    # filter training_data to the three languages
+    # filter training_data to the languages of choice
     train_df = train_df.loc[train_df.labels.isin(lang_list)]
 
-    vectorize_layer.adapt(train_df["text"].to_list())  # vectorize layer is fitted to the training data
+    # create mappings: word to integer, on the same training data,
+    # but it will now be used to vectorize the text, input by the user
+    # then to be forwarded to the inference model
+    vectorize_layer.adapt(train_df["text"].to_list())
     return vectorize_layer
 
 
@@ -58,7 +62,7 @@ def _detect_language(model, vectorize_layer, lang_list):
     """
     Detects the actual language of the input text.
     The input text itself is read from the session state.
-    Output is returned via session state as well.
+    Output is returned via session state variables as well.
     """
 
     # softmax to make a nice distribution between 0 and 1
@@ -72,31 +76,48 @@ def _detect_language(model, vectorize_layer, lang_list):
     text = st.session_state.text_input
     text_vectorized = vectorize_layer([text])
 
+    # do the actual classification, will return probabilities for each of the three languages
     logits = model.predict(text_vectorized)
+    # now equalize probabilities to a softmax function
     probits = softmax(logits)
+    # and choose the best prediction
     idx_predictions = np.argmax(probits, axis=1)
 
+    # needed to reverse the output from the classifier, which is an integer for the class to a language name
     le = preprocessing.LabelEncoder()
     le.fit(lang_list)
 
-    probability = np.max(probits, axis=1)[0]
+    # get back from a class number like 0, 1, 2 to a class name like de, es, en
     language = list(le.inverse_transform(idx_predictions))[0]
+
+    # get best probability of the three, after softmax
+    probability = np.max(probits, axis=1)[0]
 
     st.session_state.language = language
     st.session_state.probability = probability
+
+    # turn UI state model to next state
     st.session_state.ui_state = "render_result"
 
 
 def submit_feedback():
-    # insert record into database
-
-    # INSERT INTO lang_ident_feedback VALUES ( text =  st.session_state.text_input,
-    #          predicted_language = st.session_state.language,
-    #          probability = st.session_state.probability,
-    #          language_hint = st.session_state.lang_hint )
+    """
+    Insert a record into a table in a database that collects user feedback.
+    """
+    #
+    # INSERT INTO lang_ident_feedback
+    #          (text, predicted_language, probability, language_hint_by_user)
+    # VALUES (
+    #          st.session_state.text_input,
+    #          st.session_state.language,
+    #          st.session_state.probability,
+    #          st.session_state.lang_hint )
 
     # This will insert something like: "My text", "de", "0.23232", "en".
+    # So the classifier regarded this "My text" as German with 0.23 probability, but the user considers it English
+    # A record can also support the classifier like "muchas gracias", "es", "0.394", "es"
 
+    # turn UI state model to next state
     st.session_state.ui_state = "render_feedback"
 
 
@@ -135,7 +156,7 @@ def main():
         vectorize_layer = create_vectorize_layer(lang_list)
 
         st.text_area(
-            "Please enter sample text to detect language:",
+            "Please enter sample text to detect language (use 20-50 words for best results):",
             placeholder=None,
             disabled=False,
             key="text_input"
@@ -154,7 +175,7 @@ def main():
             f"""The classifier considers this text to be in {lang_labels[st.session_state.language]}. 
             It is {round(float(st.session_state.probability) * 100, 1)}% sure.""")
 
-        st.subheader("Did I get it right?")
+        st.subheader("Did it get it right?")
 
         selected_language = st.selectbox('What is the real language? Please select in any case.',
                                          ('Spanish', 'English', 'German'),
@@ -165,9 +186,9 @@ def main():
         st.write(
             f"""You classify this text as {lang_labels[st.session_state.lang_hint]}.""")
         if st.session_state.language == st.session_state.lang_hint:
-            st.write(f"""Looks like, the classifier got it right. What a smart fellow!""")
+            st.write(f"""Looks like the classifier got it right. What a smart fellow!""")
         else:
-            st.write(f"""Oh dear, there is still a long way to go for AI.""")
+            st.write(f"""Oh dear, there is still a long way to go for better training data and AI.""")
 
         st.button('Submit feedback',
                   on_click=submit_feedback)
