@@ -1,16 +1,19 @@
 """
 Language identification for the three languages: German, English, Spanish.
 
-This module encapsulates a graphical user interface in a web application served by the Python package streamlit.
+This module app.py encapsulates a graphical user interface in a web application served by the Python package streamlit.
 """
 
-import streamlit as st
 import os.path
+
+import streamlit as st
 import tensorflow as tf
+import pandas as pd
 import numpy as np
 from sklearn import preprocessing
-import pandas as pd
 
+# TODO: change to use inference pipeline here from the language_identification package
+# import language_identification.inference
 
 # allow_output_mutation=True so to suppress the warning:
 # "CachedObjectMutationWarning: Return value of load_model() was mutated between runs."
