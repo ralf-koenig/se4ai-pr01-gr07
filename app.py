@@ -119,13 +119,13 @@ def submit_feedback():
     """
 
     # DATABASE_URL is defined at https://dashboard.heroku.com/apps/se4ai-pr01-gr07/settings
-    # unter Config Vars
+    # under Config Vars
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
 
     # Open cursor to perform database operation
     cur = conn.cursor()
     postgres_insert_query = '''
-        INSERT INTO language_identification_feedback(text_from_user_input, 
+        INSERT INTO language_identification.feedback(text_from_user_input, 
                                                     language_by_classifier, 
                                                     probability_by_classifier, 
                                                     language_suggested_by_user)
