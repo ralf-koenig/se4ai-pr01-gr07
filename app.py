@@ -11,7 +11,6 @@ import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 import os
-from dotenv import load_dotenv
 import psycopg2
 
 
@@ -114,13 +113,10 @@ def submit_feedback():
     """
     Insert a record into a table in a database that collects user feedback.
     """
-    load_dotenv()
-    conn = psycopg2.connect(
-        database=os.getenv('POSTGRES_DB'),
-        user=os.getenv('POSTGRES_USER'),
-        password=os.getenv('POSTGRES_PASSWORD'),
-        host=os.getenv('POSTGRES_HOST'),
-    )
+
+    # DATABASE_URL is defined at https://dashboard.heroku.com/apps/se4ai-pr01-gr07/settings
+    # unter Config Vars
+    conn = psycopg2.connect(os.getenv('DATABASE_URL'))
 
     # Open cursor to perform database operation
     cur = conn.cursor()
