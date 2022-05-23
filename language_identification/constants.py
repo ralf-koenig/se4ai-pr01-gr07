@@ -9,8 +9,11 @@ import tensorflow as tf
 import os.path
 
 # specify directories relative to the "language_identification" folder
-DATA_DIRECTORY = os.path.join("..", "data")
-MODEL_DIRECTORY = os.path.join("..", "model")
+
+# switch data_source between 'huggingface' and 'wikipedia'
+DATA_SOURCE = "huggingface"
+DATA_DIRECTORY = os.path.join("..", "data", DATA_SOURCE)
+MODEL_DIRECTORY = os.path.join("..", "model", DATA_SOURCE)
 
 # Limit for the text vectorization step, process only top 10k most frequent words
 max_features = 10 * 1000
