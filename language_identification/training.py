@@ -220,9 +220,8 @@ def save_model_to_model_directory(model, filename):
     # pipeline rebuild the Vectorize layer and LabelEncoder
     # based on common constants in language_identification.constants
     save_result = model.save(
-        filepath=os.path.join(
-            constants.MODEL_DIRECTORY,
-            filename)
+        filepath=os.path.join(constants.MODEL_DIRECTORY, filename),
+        overwrite=False
     )
     return save_result
 
