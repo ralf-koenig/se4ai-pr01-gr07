@@ -1,22 +1,32 @@
+"""
+Language identification for the three languages: German, English, Spanish.
+
+This module is the scraping component for wikipedia articles.
+It has a built-in list of URLS of articles that exists on each of
+the wikipedia sites: de.wikipedia.org, en.wikipedia.org, es.wikipedia.org.
+These are all downloaded, cleaned mildly, separated to three sets for
+training, validation, test and saved to CSV files in the current folder.
+"""
+
 import random
 import requests
 from bs4 import BeautifulSoup
 import re
 import csv
-import nltk
+import nltk.tokenize
 import math
+
 nltk.download('punkt')
-from nltk import tokenize
 
 
 # link for extracting html data
-def getdata(url):
+def get_data(url):
     r = requests.get(url)
     return r.text
 
 
 def get_text_from_html(url):
-    html_data = getdata(url)
+    html_data = get_data(url)
     soup = BeautifulSoup(html_data, 'html.parser')
     clean_text = ""
     for data in soup.find_all("p"):
@@ -28,7 +38,7 @@ def remove_spanish_citation(spanish_sentence):
     return spanish_sentence.replace("\u200b\u200b", " ").replace("\u200b", " ").replace("«", " ").replace("»", " ")
 
 
-def remove_short_sentence(split_sentence, language_id):
+def remove_short_sentence(split_sentence, language_prefix):
     # Append short cut sentence to prior sentence and remove it from dataset
     i = 1
     remove_elements = []
@@ -36,7 +46,7 @@ def remove_short_sentence(split_sentence, language_id):
         if len(split_sentence[i].split()) < 7:
             split_sentence[i - 1] += split_sentence[i]
             remove_elements.append(i)
-        split_sentence[i] = language_id + split_sentence[i]
+        split_sentence[i] = language_prefix + split_sentence[i]
         i += 1
 
     for element in sorted(remove_elements, reverse=True):
@@ -54,11 +64,11 @@ def generate_sentences_from_wikipedia(url, language):
     if language == "es":
         clean_text = remove_spanish_citation(clean_text)
     # Split text into sentences
-    split_sentence = tokenize.sent_tokenize(clean_text)
+    split_sentence = nltk.tokenize.sent_tokenize(clean_text)
     # Create prefix for training data
-    language_id = language + ","
+    language_prefix = language + ","
 
-    return remove_short_sentence(split_sentence, language_id)
+    return remove_short_sentence(split_sentence, language_prefix)
 
 
 def get_language_of_article(url):
@@ -67,72 +77,72 @@ def get_language_of_article(url):
 
 
 def generate_sentence_from_list_of_articles(urls):
-    all_sentences = []
+    sentences = []
     for url in urls:
-        language_id = get_language_of_article(url)
-        for sentence in generate_sentences_from_wikipedia(url, language_id):
-            all_sentences.append(sentence)
-    return all_sentences
+        language = get_language_of_article(url)
+        for sentence in generate_sentences_from_wikipedia(url, language):
+            sentences.append(sentence)
+    return sentences
 
 
-def specify_language_of_wikipedia_article(urls, language_id):
-    all_urls = []
+def specify_language_of_wikipedia_article(urls, language):
+    collected_urls = []
     for url in urls:
-        all_urls.append("https://" + language_id + url)
-    return all_urls
+        collected_urls.append("https://" + language + url)
+    return collected_urls
 
 
-def generate_csv(all_sentences, filename):
-    with open(filename, 'w') as csvfile:
-        filewriter = csv.writer(csvfile, delimiter=',', )
-        filewriter.writerow(['labels', 'text'])
-        for sentence in all_sentences:
-            filewriter.writerow([sentence[:2], sentence[3:]])
+def generate_csv(sentences, filename):
+    with open(filename, 'w', encoding='utf-8') as csv_file:
+        file_writer = csv.writer(csv_file, delimiter=',', )
+        file_writer.writerow(['labels', 'text'])
+        for sentence in sentences:
+            file_writer.writerow([sentence[:2], sentence[3:]])
 
 
-def remove_long_rows(all_sentences):
-    for sentence in all_sentences:
+def remove_long_rows(sentences):
+    for sentence in sentences:
         if '\n' in sentence:
-            all_sentences.remove(sentence)
-    return all_sentences
+            sentences.remove(sentence)
+    return sentences
 
 
-def remove_weird_rows(all_sentences):
-    for sentence in all_sentences:
+def remove_weird_rows(sentences):
+    for sentence in sentences:
         if not sentence.startswith("de") or sentence.startswith("en") or sentence.startswith("es"):
-            all_sentences.remove(sentence)
-    return all_sentences
+            sentences.remove(sentence)
+    return sentences
 
 
-def split_data(all_sentences):
+def split_data(sentences):
     train_test_ratio = 0.8
-    train_size = int(math.ceil(len(all_sentences))*train_test_ratio)
-    test_size = int(train_size + (len(all_sentences) - train_size) / 2)
-    train = all_sentences[0:train_size]
-    test = all_sentences[train_size + 1:test_size]
-    valid = all_sentences[test_size + 1:len(all_sentences)]
-    return train, test, valid
+    train_size = int(math.ceil(len(sentences)) * train_test_ratio)
+    test_size = int(train_size + (len(sentences) - train_size) / 2)
+    training_list = sentences[0:train_size]
+    test_list = sentences[train_size + 1:test_size]
+    validation_list = sentences[test_size + 1:len(sentences)]
+    return training_list, test_list, validation_list
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
-    urls = [".wikipedia.org/wiki/Linus_Torvalds",
-                ".wikipedia.org/wiki/Leipzig",
-                ".wikipedia.org/wiki/Madrid",
-                ".wikipedia.org/wiki/Sigmund_Freud",
-                ".wikipedia.org/wiki/Pablo_Picasso",
-                ".wikipedia.org/wiki/Wolfgang_Amadeus_Mozart",
-                ".wikipedia.org/wiki/Marie_Curie",
-                ".wikipedia.org/wiki/Stephen_Hawking",
-                ".wikipedia.org/wiki/Galileo_Galilei",
-                ".wikipedia.org/wiki/Immanuel_Kant",
-                ".wikipedia.org/wiki/James_Clerk_Maxwell",
-                ".wikipedia.org/wiki/Angela_Merkel"]
+    partial_urls = [".wikipedia.org/wiki/Linus_Torvalds",
+                    ".wikipedia.org/wiki/Leipzig",
+                    ".wikipedia.org/wiki/Madrid",
+                    ".wikipedia.org/wiki/Sigmund_Freud",
+                    ".wikipedia.org/wiki/Pablo_Picasso",
+                    ".wikipedia.org/wiki/Wolfgang_Amadeus_Mozart",
+                    ".wikipedia.org/wiki/Marie_Curie",
+                    ".wikipedia.org/wiki/Stephen_Hawking",
+                    ".wikipedia.org/wiki/Galileo_Galilei",
+                    ".wikipedia.org/wiki/Immanuel_Kant",
+                    ".wikipedia.org/wiki/James_Clerk_Maxwell",
+                    ".wikipedia.org/wiki/Angela_Merkel"]
 
     all_urls = []
     languages = ["de", "en", "es"]
     for language_id in languages:
-        all_articles = specify_language_of_wikipedia_article(urls, language_id)
+        all_articles = specify_language_of_wikipedia_article(partial_urls, language_id)
         for article in all_articles:
             all_urls.append(article)
 
@@ -144,18 +154,3 @@ if __name__=="__main__":
     generate_csv(train, "train.csv")
     generate_csv(test, "test.csv")
     generate_csv(valid, "valid.csv")
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
