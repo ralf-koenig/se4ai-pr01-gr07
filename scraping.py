@@ -4,8 +4,10 @@ from bs4 import BeautifulSoup
 import re
 import csv
 import nltk
+import math
 nltk.download('punkt')
 from nltk import tokenize
+
 
 # link for extracting html data
 def getdata(url):
@@ -41,6 +43,7 @@ def remove_short_sentence(split_sentence, language_id):
         del split_sentence[element]
 
     return split_sentence
+
 
 def generate_sentences_from_wikipedia(url, language):
     clean_text = get_text_from_html(url)
@@ -79,12 +82,13 @@ def specify_language_of_wikipedia_article(urls, language_id):
     return all_urls
 
 
-def generate_csv(all_sentences):
-    with open('train.csv', 'w') as csvfile:
+def generate_csv(all_sentences, filename):
+    with open(filename, 'w') as csvfile:
         filewriter = csv.writer(csvfile, delimiter=',', )
         filewriter.writerow(['labels', 'text'])
         for sentence in all_sentences:
             filewriter.writerow([sentence[:2], sentence[3:]])
+
 
 def remove_long_rows(all_sentences):
     for sentence in all_sentences:
@@ -98,6 +102,16 @@ def remove_weird_rows(all_sentences):
         if not sentence.startswith("de") or sentence.startswith("en") or sentence.startswith("es"):
             all_sentences.remove(sentence)
     return all_sentences
+
+
+def split_data(all_sentences):
+    train_test_ratio = 0.8
+    train_size = int(math.ceil(len(all_sentences))*train_test_ratio)
+    test_size = int(train_size + (len(all_sentences) - train_size) / 2)
+    train = all_sentences[0:train_size]
+    test = all_sentences[train_size + 1:test_size]
+    valid = all_sentences[test_size + 1:len(all_sentences)]
+    return train, test, valid
 
 
 if __name__=="__main__":
@@ -126,7 +140,13 @@ if __name__=="__main__":
     all_sentences = remove_long_rows(all_sentences)
     all_sentences = remove_weird_rows(all_sentences)
     random.shuffle(all_sentences)
-    generate_csv(all_sentences)
+    train, test, valid = split_data(all_sentences)
+    generate_csv(train, "train.csv")
+    generate_csv(test, "test.csv")
+    generate_csv(valid, "valid.csv")
+
+    
+
 
 
 
