@@ -116,7 +116,7 @@ def submit_feedback():
 
     # DATABASE_URL is defined at https://dashboard.heroku.com/apps/se4ai-pr01-gr07/settings
     # unter Config Vars
-    conn = psycopg2.connect(os.getenv('DATABASE_URL'))
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
 
     # Open cursor to perform database operation
     cur = conn.cursor()
