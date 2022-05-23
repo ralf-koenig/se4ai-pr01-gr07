@@ -14,21 +14,21 @@ but reorganizes the code to a Python module structure with defined functions.
 The code is split into training.py and inference.py. Common aspects needed by both of them are in 
 constants.py.
 
-### constants.py
+### `constants.py`
 This module encapsulates common constants for model training and inference pipeline.
 
-### training.py
+### `training.py`
 
 This module encapsulates the model building functions, this means
 applying supervised learning on a classification problem:
 start with labeled text samples. "label" is the true language of the sample,
-expressed as ISO code like en, es, de.
+expressed as ISO code like `en`, `es`, `de`.
 
 The model building functions will take care of the steps needed to
 process the text samples and to train a proper KERAS model for
 this classifier.
 
-### inference.py
+### `inference.py`
 
 This module encapsulates the inference functions, this means:
 input a text sample in one of the three languages
