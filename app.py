@@ -1,123 +1,44 @@
 """
 Language identification for the three languages: German, English, Spanish.
 
-This module app.py encapsulates a graphical user interface in a web application served by the Python package streamlit.
+This module app.py encapsulates a graphical user interface in a web application
+served by the Python package streamlit.
 """
 
-import os.path
 import streamlit as st
-import pandas as pd
-import numpy as np
-from sklearn import preprocessing
 import os
 import psycopg2
-import sys
-
-
-# suppress tensorflow CUDA warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf
-
-# append the "language_identification" folder to PYTHONPATH
-# where Python searches for packages
-sys.path.append('.')
-# this way we can import from language_identification
 
 # common constants that must match between training and inference
 import language_identification.constants as constants
+import language_identification.inference as inference
 
 # select "huggingface" (as in lab course)
 # or select "wikipedia" (from our scraping data) for the model
-# this will then be used as a subfolder in DATA_DIRECTORY and MODEL_DIRECTORY
-DATA_SOURCE = "huggingface"
-
-# data directory to the training data, from where the vectorizer will be built
-DATA_DIRECTORY = "data"
-
-# model directory from where the model is read
-MODEL_DIRECTORY = "model"
+# this will then be used as a sub folder in DATA_DIRECTORY and MODEL_DIRECTORY
+DATA_SOURCE = "wikipedia"
 
 
 # allow_output_mutation=True so to suppress the warning:
 # "CachedObjectMutationWarning: Return value of load_model() was mutated between runs."
 @st.cache(allow_output_mutation=True)
 def load_model(data_source, filename_bare: str):
+    model = inference.load_model(data_source, filename_bare)
+    return model
+
+
+def _detect_language(vectorize_layer, model):
     """
-    Loads a H5 model file from the file system. This was built during training with training.py --train-model
+    Read text_input from session state, vectorization layer and model from arguments
+    and run language detection. inference.opy does the heavy lifting.
+
+    :param vectorize_layer: a KERAS TextVectorization layer
+    :param model:  a KERAS model trained by training.py --train_model
+    :return: language (most probable language as considered by the classifier)
+            and probability via session state
     """
-    if filename_bare == '':
-        return None
-    else:
-        # Load the model
-        path = os.path.join(MODEL_DIRECTORY, data_source, filename_bare)
-
-        try:
-            saved_model = tf.keras.models.load_model(path)
-            return saved_model
-        except OSError:
-            st.error("Could not open/read file:", path)
-
-
-# cannot be cached due to object type, would need hash method for caching in streamlit
-def create_vectorize_layer(data_source):
-    """
-    Creates the vectorize layer that is needed for the input text to be converted to numbers.
-    """
-    # create a layer that processes words to integer numbers
-    vectorize_layer = tf.keras.layers.TextVectorization(
-        standardize="lower_and_strip_punctuation",
-        max_tokens=constants.max_features,
-        output_mode='int',
-        output_sequence_length=constants.sequence_length
-    )
-
-    # load training data in to Pandas data frame
-    train_df = pd.read_csv(os.path.join(DATA_DIRECTORY, data_source, "train.csv"))
-
-    # filter training_data to the languages of choice
-    train_df = train_df.loc[train_df.labels.isin(list(constants.lang_labels.keys()))]
-
-    # create mappings: word to integer, on the same training data,
-    # but it will now be used to vectorize the text, input by the user
-    # then to be forwarded to the inference model
-    vectorize_layer.adapt(train_df["text"].to_list())
-    return vectorize_layer
-
-
-def _detect_language(model, vectorize_layer):
-    """
-    Detects the actual language of the input text.
-    The input text itself is read from the session state.
-    Output is returned via session state variables as well.
-    """
-
-    # softmax to make a nice distribution between 0 and 1
-    def softmax(x):
-        """Compute softmax values for each set of scores in x."""
-        maxm = np.max(x, axis=1, keepdims=True)  # returns max of each row and keeps same dims
-        e_xm = np.exp(x - maxm)  # subtracts each row with its max value
-        summ = np.sum(e_xm, axis=1, keepdims=True)  # returns sum of each row and keeps same dims
-        return e_xm / summ
-
     text = st.session_state.text_input
-    text_vectorized = vectorize_layer([text])
-
-    # do the actual classification, will return probabilities for each of the three languages
-    logits = model.predict(text_vectorized)
-    # now equalize probabilities to a softmax function
-    probits = softmax(logits)
-    # and choose the best prediction
-    idx_predictions = np.argmax(probits, axis=1)
-
-    # needed to reverse the output from the classifier, which is an integer for the class to a language name
-    le = preprocessing.LabelEncoder()
-    le.fit(list(constants.lang_labels.keys()))
-
-    # get back from a class number like 0, 1, 2 to a class name like de, en, es
-    language = list(le.inverse_transform(idx_predictions))[0]
-
-    # get best probability of the three, after softmax
-    probability = np.max(probits, axis=1)[0]
+    language, probability = inference.detect_language(text, vectorize_layer, model)
 
     st.session_state.language = language
     st.session_state.probability = probability
@@ -126,14 +47,17 @@ def _detect_language(model, vectorize_layer):
     st.session_state.ui_state = "render_result"
 
 
-def submit_feedback():
+def _submit_feedback():
     """
-    Insert a record into a table in a database that collects user feedback.
+    Insert a feedback record into a table in a database. With training.py --feedback
+    this feedback can be queried from the database and put into data/feedback
+    for inspection and selection and eventually using feedback for retraining the
+    model later on this additional data.
     """
 
     # DATABASE_URL is defined at https://dashboard.heroku.com/apps/se4ai-pr01-gr07/settings
     # under Config Vars
-    # For local execution on a developer machine, add an enivronment variable
+    # For local execution on a developer machine, add an environment variable
     # DATABASE_URL to the "Run Configuration" of your IDE
     # The database URL with credentials is submitted to you via e-mail.
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
@@ -167,14 +91,21 @@ def submit_feedback():
     st.session_state.ui_state = "render_feedback"
 
 
-def get_input():
-    # load pickled language model
+def _get_input():
+    """
+    First state in the UI state model:
+    Load language model and vectorization layer from the inference functions.
+    Provide text box for user to input text sample.
+    Provide button to start language detection.
+
+    Wait for on_click event on button to proceed, then start .
+    """
     language_model = load_model(DATA_SOURCE, "simple_mlp_novectorize.h5")
-    # create the necessary vectorize layer for the text input
-    vectorize_layer = create_vectorize_layer(DATA_SOURCE)
+    vectorize_layer = inference.create_vectorize_layer(DATA_SOURCE, "train.csv")
 
     st.text_area(
-        "Please enter sample text to detect language (use 20-50 words for best results):",
+        label="Please enter sample text to detect language (use 20-50 words for best results, max 1000 characters):",
+        max_chars=1000,
         placeholder=None,
         disabled=False,
         key="text_input"
@@ -183,11 +114,16 @@ def get_input():
     st.button(
         label='Detect language',
         on_click=_detect_language,
-        args=(language_model, vectorize_layer)
+        args=(vectorize_layer, language_model)
     )
 
 
-def render_result():
+def _render_result():
+    """
+    Second state in UI model: Provide results of running language detection to user.
+    Also provides a selection box for the user to give his/her opinion on classification quality
+    and the "true" language. Waits for the user to click a button to send this feedback.
+    """
     st.text_area("Your entered text", value=st.session_state.text_input, disabled=True, key="text_input")
 
     st.write(
@@ -213,10 +149,13 @@ def render_result():
         st.write(f"""Oh dear, there is still a long way to go for better training data and AI.""")
 
     st.button('Submit feedback',
-              on_click=submit_feedback)
+              on_click=_submit_feedback)
 
 
-def render_feedback():
+def _render_feedback():
+    """
+    Just say thank you. And wait for button click to restart with newly initialized session.
+    """
     st.subheader("Your feedback")
     st.success("Thank you for your feedback. This will improve the classifier.")
     st.session_state.clear()
@@ -224,14 +163,20 @@ def render_feedback():
 
 
 def main():
-    # The next two UI elements are common for all screens
+    """
+    Main Loop of streamlit, where it acts as a one-page application.
+    Uses a simple state machine model for the UI: get_input -> render_result -> render_feedback.
+    Uses session variables to handle state.
+    """
+
+    # common UI elements for all screens
     st.title('SE4AI - Language Identification - Group 07')
 
+    st.write(f"Classifier is working on processed source data from: {DATA_SOURCE}.")
+
     with st.sidebar:
-        """
-        This is a simple streamlit application that guesses the language of the text passed out of German, 
-        English, Spanish.
-        """
+        """This is a simple streamlit application that guesses the language of the text passed 
+        out of German, English, Spanish."""
 
     # initialize session state variables
     if "text_input" not in st.session_state:
@@ -245,16 +190,13 @@ def main():
     if "ui_state" not in st.session_state:
         st.session_state.ui_state = "get_input"
 
-    ################################################################################################
-    # Use a very simple state machine model for the UI: get_input -> render_result -> render_feedback
-    ################################################################################################
-
+    # simple three-state state machine
     if st.session_state.ui_state == "get_input":
-        get_input()
+        _get_input()
     elif st.session_state.ui_state == "render_result":
-        render_result()
+        _render_result()
     elif st.session_state.ui_state == "render_feedback":
-        render_feedback()
+        _render_feedback()
 
 
 if __name__ == "__main__":
