@@ -9,13 +9,31 @@ expressed as ISO code like en, es, de.
 The model building functions will take care of the steps needed to
 process the text samples and to train a proper KERAS model for
 this classifier.
+
+Needs environment variable DATABASE_URL to read user feedback from database.
+For training a model, this environment variable is not needed.
 """
 
-import tensorflow as tf
+import os
 import pandas as pd
 import requests
 import os.path
 from sklearn import preprocessing
+import sys
+import psycopg2
+import csv
+import argparse
+
+# suppress tensorflow CUDA warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
+
+# append the "language_identification" folder to PYTHONPATH
+# where Python searches for packages
+sys.path.append('..')
+# this way you can start training.py with
+# python training.py -h
+# inside the language_identification folder. "-h" will list all options.
 
 # common constants that must match between training and inference
 import language_identification.constants as constants
@@ -39,14 +57,49 @@ def acquire_text_sample_data_huggingface():
     download("https://huggingface.co/datasets/papluca/language-identification/resolve/main/test.csv", "test.csv")
 
 
-def acquire_user_feedback():
+def acquire_user_feedback_from_database(to_csv_file):
     """
-    Gets user feedback from the database and
-    :return:
+    Gets user feedback from the database and put to data/feedback.
     """
 
+    # DATABASE_URL is defined at https://dashboard.heroku.com/apps/se4ai-pr01-gr07/settings
+    # under Config Vars
+    # For local execution on a developer machine, add an environment variable
+    # DATABASE_URL to the "Run Configuration" of your IDE or in your shell.
+    # The database URL with credentials is submitted to you via e-mail.
+    print("Connecting to database ...")
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    except KeyError:
+        print("\n[ERROR] Set environmment variable DATABASE_URL to a Postgres URI before using this routine.")
+        sys.exit(1)
 
-def preprocess_data():
+    # Open cursor to perform database operation
+    cur = conn.cursor()
+    postgres_select_query = '''SELECT language_suggested_by_user, 
+                                      text_from_user_input 
+                               FROM language_identification.feedback'''
+    cur.execute(postgres_select_query)
+    print("Fetching feedback records ...")
+    db_feedback_records = cur.fetchall()
+
+    to_csv_file = os.path.join(constants.FEEDBACK_DIRECTORY, to_csv_file)
+
+    with open(to_csv_file, 'w', encoding='utf-8', newline='') as csv_file:
+        file_writer = csv.writer(csv_file, delimiter=',')
+        file_writer.writerow(['labels', 'text'])
+        for record in db_feedback_records:
+            file_writer.writerow([record[0], record[1]])
+
+    print()
+    print(f"{len(db_feedback_records)} feedback records written to {to_csv_file}")
+
+    # Close communications with database
+    cur.close()
+    conn.close()
+
+
+def preprocess_data(data_source):
     """
     Load data from CSV into Panda Dataframes and filter to the languages of interest.
     Pandas Dataframe of label (like "de", "es", "en") and text (text sample as string)
@@ -56,14 +109,14 @@ def preprocess_data():
              test_df:  Pandas Dataframe of of test data
     """
 
-    train_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, "train.csv"))
-    val_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, "valid.csv"))
-    test_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, "test.csv"))
+    train_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, data_source, "train.csv"))
+    val_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, data_source, "valid.csv"))
+    test_df = pd.read_csv(os.path.join(constants.DATA_DIRECTORY, data_source, "test.csv"))
 
     # Keep only "en", "es" and "de", drop all other text samples
-    train_df = train_df.loc[train_df.labels.isin(constants.lang_list)]
-    val_df = val_df.loc[val_df.labels.isin(constants.lang_list)]
-    test_df = test_df.loc[test_df.labels.isin(constants.lang_list)]
+    train_df = train_df.loc[train_df.labels.isin(list(constants.lang_labels.keys()))]
+    val_df = val_df.loc[val_df.labels.isin(list(constants.lang_labels.keys()))]
+    test_df = test_df.loc[test_df.labels.isin(list(constants.lang_labels.keys()))]
 
     return train_df, val_df, test_df
 
@@ -90,7 +143,7 @@ def extract_features(train_df, val_df, test_df):
     # This is done using LabelEncoder from scikit-learn
     # It's quite useful when the number if classes is high
     le = preprocessing.LabelEncoder()
-    le.fit(constants.lang_list)
+    le.fit(list(constants.lang_labels.keys()))
     num_classes = len(le.classes_)
 
     # BEWARE: "pop" will remove the 'labels' attribute from the data frame
@@ -176,9 +229,9 @@ def train_model(train_ds, val_ds):
     # to improve training time (training data set) and inference time (validation data set).
     # It allows tensorflow to prepare the data while it trains the model
     train_ds = train_ds.batch(batch_size=constants.batch_size)
-    train_ds = train_ds.prefetch(constants.AUTOTUNE)
+    train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
     val_ds = val_ds.batch(batch_size=constants.batch_size)
-    val_ds = val_ds.prefetch(constants.AUTOTUNE)
+    val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
 
     # Finally do training in a number of epochs
     epochs = 10
@@ -203,15 +256,15 @@ def evaluate_model(model, test_ds):
     # Applying cache techniques for improving inference and training time
     # It allows tensorflow to prepare the data while it trains the model
     test_ds = test_ds.batch(batch_size=constants.batch_size)
-    test_ds = test_ds.prefetch(constants.AUTOTUNE)
+    test_ds = test_ds.prefetch(tf.data.AUTOTUNE)
     # now use KERAS function to
     loss, accuracy = model.evaluate(test_ds)
     return loss, accuracy
 
 
-def save_model_to_model_directory(model, filename):
+def save_model_to_model_directory(model, data_source, filename):
     # Save the model
-    if not os.path.isdir(constants.MODEL_DIRECTORY):
+    if not os.path.isdir(os.path.join(constants.MODEL_DIRECTORY, data_source)):
         os.mkdir(constants.MODEL_DIRECTORY)
 
     # ATTENTION: Here we are only saving the tf model.
@@ -220,20 +273,41 @@ def save_model_to_model_directory(model, filename):
     # pipeline rebuild the Vectorize layer and LabelEncoder
     # based on common constants in language_identification.constants
     save_result = model.save(
-        filepath=os.path.join(constants.MODEL_DIRECTORY, filename),
+        filepath=os.path.join(constants.MODEL_DIRECTORY, data_source, filename),
         overwrite=False
     )
     return save_result
 
 
-def main():
-    train_df, val_df, test_df = preprocess_data()
+def training_pipeline(data_source):
+    train_df, val_df, test_df = preprocess_data(data_source)
     train_ds, val_ds, test_ds = extract_features(train_df, val_df, test_df)
     model = train_model(train_ds, val_ds)
     loss, accuracy = evaluate_model(model, test_ds)
     print("Loss: ", loss)
     print("Accuracy: ", accuracy)
-    save_model_to_model_directory(model, "simple_mlp_novectorize.h5")
+    save_model_to_model_directory(model, data_source, "simple_mlp_novectorize.h5")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Language Identification - Feedback Download and Training Pipeline')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-f", "--feedback", help="add <filename.csv> to write feedback from DB to a local CSV file")
+    group.add_argument("-t", "--train-model", help="train a model for one particular data source",
+                       choices=['huggingface', 'wikipedia'])
+    args = parser.parse_args()
+
+    if getattr(args, 'feedback') is not None:
+        filename = getattr(args, 'feedback')
+        acquire_user_feedback_from_database(filename)
+
+    if getattr(args, 'train_model') is not None:
+        data_source = getattr(args, 'train_model')
+        training_pipeline(data_source)
+
+    if getattr(args, 'feedback') is None and getattr(args, 'train_model') is None:
+        parser.print_help(sys.stderr)
 
 
 if __name__ == "__main__":
