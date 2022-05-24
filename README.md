@@ -30,6 +30,10 @@ streamlit run app.py
 
 # else
 python -m streamlit run app.py
+
+# or
+# create .env file in root dir and add DATABASE_URL=...
+docker-compose up
 ```
 
 ## Run tests locally (also part of CI/CD pipeline at GitHub server)
