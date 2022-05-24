@@ -1,6 +1,6 @@
 CREATE SCHEMA IF NOT EXISTS language_identification;
 
-CREATE TABLE language_identification.feedback
+CREATE TABLE IF NOT EXISTS language_identification.feedback
 (
     id                         serial primary key,
     text_from_user_input       text not null,
