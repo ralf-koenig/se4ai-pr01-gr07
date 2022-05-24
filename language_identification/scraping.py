@@ -15,12 +15,24 @@ import re
 import csv
 import nltk.tokenize
 import math
+import os.path
+import sys
+
+# append the "language_identification" folder to PYTHONPATH
+# where Python searches for packages
+sys.path.append('..')
+# this way you can start scraping.py with
+# python scraping.py inside the language_identification folder
+
+# common constants that must match between training and inference
+import language_identification.constants as constants
 
 nltk.download('punkt')
 
 
 # link for extracting html data
 def get_data(url):
+    print(f"Downloading {url} ...")
     r = requests.get(url)
     return r.text
 
@@ -93,11 +105,13 @@ def specify_language_of_wikipedia_article(urls, language):
 
 
 def generate_csv(sentences, filename):
-    with open(filename, 'w', encoding='utf-8') as csv_file:
-        file_writer = csv.writer(csv_file, delimiter=',', )
+    filename = os.path.join(constants.DATA_DIRECTORY, "wikipedia", filename)
+    with open(filename, 'w', encoding='utf-8', newline='') as csv_file:
+        file_writer = csv.writer(csv_file, delimiter=',')
         file_writer.writerow(['labels', 'text'])
         for sentence in sentences:
             file_writer.writerow([sentence[:2], sentence[3:]])
+    print(f"{filename}: {len(sentences)} text samples written.")
 
 
 def remove_long_rows(sentences):
@@ -140,7 +154,7 @@ if __name__ == "__main__":
                     ".wikipedia.org/wiki/Angela_Merkel"]
 
     all_urls = []
-    languages = ["de", "en", "es"]
+    languages = list(constants.lang_labels.keys())
     for language_id in languages:
         all_articles = specify_language_of_wikipedia_article(partial_urls, language_id)
         for article in all_articles:
