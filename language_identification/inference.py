@@ -18,7 +18,7 @@ from sklearn import preprocessing
 import language_identification.constants as constants
 
 
-def load_model(filename_bare):
+def load_model(data_source, filename_bare):
     """
     Load a KERAS model (H5py format) from a file in the MODEL DIRECTORY.
     Take care: you will need the vectorizer for the text (on same training data)
@@ -27,7 +27,7 @@ def load_model(filename_bare):
     :param filename_bare: the pure filename within the model directory
     :return: the saved model in KERAS representation
     """
-    filename = os.path.join(constants.MODEL_DIRECTORY, filename_bare)
+    filename = os.path.join(constants.MODEL_DIRECTORY, data_source, filename_bare)
     saved_model = tf.keras.models.load_model(filename)
     return saved_model
 
@@ -99,9 +99,10 @@ def infer_from_model(model, text_in_vectorized_representation):
         summ = np.sum(e_xm, axis=1, keepdims=True)  # returns sum of each row and keeps same dims
         return e_xm / summ
 
-    # set up a simple Label encoder that will translate between ["de", "en", "es"] <=> [0, 1, 2]
+    # set up a simple Label encoder
     le = preprocessing.LabelEncoder()
-    le.fit(constants.lang_list)  # 0=de, 1=en, 2=es, due to automatic alphabetic sorting of the label encoder
+    # that will translate between ["de", "en", "es"] <=> [0, 1, 2]
+    le.fit(list(constants.lang_labels.keys()))  # 0=de, 1=en, 2=es, label encoder does alphabetic sorting
 
     # do the actual classification, will return probabilities for each of the three languages
     logits = model.predict(text_in_vectorized_representation)
