@@ -9,4 +9,4 @@ repository from smba for later reference.  Files have been modified by us during
 * testing the matrix calculations in the `softmax` function
   * `test_sum.py`
 
-**Please kindly disregard this folder. Kept here for reference.**
+**Please kindly disregard this folder. Kept here for reference.** 

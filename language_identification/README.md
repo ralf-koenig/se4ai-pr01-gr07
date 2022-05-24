@@ -18,7 +18,7 @@ applying supervised learning on a classification problem:
 start with labeled text samples. `label` in the `train.csv` files is the true language 
 of the sample, expressed as an ISO code such as `en`, `es`, `de`.
 
-### Model building
+### Model building 
 
 The model building functions will take care of the steps needed to
 process the text samples and to train a proper KERAS model for

@@ -45,4 +45,4 @@ python -m pytest -vvv test_app.py -s
 
 ### Workflows resulting from GitHub Actions
 
-see [Github Project - All workflows](https://github.com/ralf-koenig/se4ai-pr01-gr07/actions)
+see [Github Project - All workflows](https://github.com/ralf-koenig/se4ai-pr01-gr07/actions) 
