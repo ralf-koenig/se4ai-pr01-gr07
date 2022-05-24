@@ -1,7 +1,7 @@
 """
 Language identification for the three languages: German, English, Spanish.
 
-This module is the scraping component for wikipedia articles.
+This module scraping.py is the scraping component for wikipedia articles.
 It has a built-in list of URLS of articles that exists on each of
 the wikipedia sites: de.wikipedia.org, en.wikipedia.org, es.wikipedia.org.
 These are all downloaded, cleaned mildly, separated to three sets for
